@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noctrix — Close the loop</title>
+<meta name="description" content="Noctrix connects code review, incident response, infrastructure cost and delivery flow into one causal graph. Built for engineering orgs where AI now writes half the code.">
+<meta property="og:title" content="Noctrix — Close the loop">
+<meta property="og:description" content="AI made code cheap. Verification got expensive. Noctrix is the engineering intelligence layer that remembers what production did.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://noctrix.digital">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3a13 13 0 1 1-9.2 22.2' fill='none' stroke='%2322E0A8' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='6.8' cy='25.2' r='3.4' fill='%2322E0A8'/%3E%3C/svg%3E">
+
+<style>
+/* ============================================================
+   NOCTRIX — DESIGN TOKENS
+   Accent: "signal jade" #22E0A8 — the colour of a healthy status
+   indicator in an ops console. Deliberately not acid-lime and not
+   the default cyan; low enough in saturation to stay calm at 3am.
+   ============================================================ */
+:root{
+  --bg:#000;
+  --bg-raise:#050706;
+  --glass:rgba(14,18,17,.6);
+  --glass-solid:rgba(10,13,12,.92);
+  --line:rgba(255,255,255,.08);
+  --line-strong:rgba(255,255,255,.16);
+  --white:#fff;
+  --grey:#9BA6A3;
+  --grey-dim:#5C6764;
+  --accent:#22E0A8;
+  --accent-bright:#63F5C6;
+  --accent-dim:rgba(34,224,168,.12);
+  --accent-line:rgba(34,224,168,.32);
+  --warn:#E8B54A;
+  --crit:#E8695C;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --maxw:1240px;
+  --pad:40px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);
+  color:var(--white);
+  font-family:var(--sans);
+  font-weight:400;
+  font-size:16px;
+  line-height:1.6;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:3px;
+  border-radius:4px;
+}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding-left:var(--pad);padding-right:var(--pad)}
+
+/* ---------- shared type ---------- */
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--accent);
+  display:inline-flex;
+  align-items:center;
+  gap:9px;
+}
+.eyebrow::before{
+  content:"";
+  width:18px;height:1px;
+  background:var(--accent);
+  opacity:.7;
+}
+.eyebrow.is-center{justify-content:center}
+
+h1,h2,h3,h4{font-weight:300;letter-spacing:-.02em;line-height:1.06}
+.h-xl{font-size:clamp(38px,5.4vw,72px)}
+.h-lg{font-size:clamp(32px,4.2vw,56px)}
+.h-md{font-size:clamp(24px,2.6vw,34px);letter-spacing:-.015em;line-height:1.15}
+.lead{color:var(--grey);font-size:17px;line-height:1.65;font-weight:300}
+.accent-txt{color:var(--accent)}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  padding:13px 26px;border-radius:100px;
+  font-size:14px;font-weight:500;letter-spacing:-.01em;
+  transition:transform .25s cubic-bezier(.22,1,.36,1),background .25s,color .25s,border-color .25s,box-shadow .25s;
+  white-space:nowrap;
+}
+.btn:hover{transform:translateY(-2px)}
+.btn-accent{background:var(--accent);color:#00120C}
+.btn-accent:hover{background:var(--accent-bright);box-shadow:0 10px 34px rgba(34,224,168,.28)}
+.btn-white{background:var(--white);color:#000}
+.btn-white:hover{background:var(--accent-bright);box-shadow:0 10px 34px rgba(34,224,168,.24)}
+.btn-ghost{border:1px solid var(--line-strong);color:var(--white)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:10px 20px;font-size:13px}
+
+/* ============================================================
+   NAV
+   ============================================================ */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px var(--pad);
+  transition:padding .35s cubic-bezier(.22,1,.36,1);
+}
+.nav.compact{padding:12px var(--pad)}
+
+.brand{display:flex;align-items:center;gap:11px;transition:opacity .3s,transform .35s cubic-bezier(.22,1,.36,1)}
+.brand svg{width:26px;height:26px;flex:none}
+.brand-name{font-size:19px;font-weight:500;letter-spacing:-.03em}
+.nav.compact .brand{opacity:0;transform:translateX(-14px);pointer-events:none}
+
+.pill{
+  display:flex;align-items:center;gap:4px;
+  background:var(--glass);
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  border:1px solid var(--line);
+  border-radius:100px;
+  padding:6px 6px 6px 14px;
+  transition:padding .35s cubic-bezier(.22,1,.36,1),background .3s;
+}
+.pill-mark{
+  width:0;overflow:hidden;opacity:0;
+  transition:width .35s cubic-bezier(.22,1,.36,1),opacity .3s,margin .35s;
+  display:flex;align-items:center;
+}
+.pill-mark svg{width:20px;height:20px;flex:none}
+.nav.compact .pill-mark{width:20px;opacity:1;margin-right:10px}
+
+.pill a.nlink{
+  position:relative;
+  font-size:13.5px;font-weight:400;color:var(--grey);
+  padding:8px 14px;border-radius:100px;
+  transition:color .2s;
+}
+.pill a.nlink:hover{color:var(--white)}
+.pill a.nlink.active{color:var(--white)}
+.pill a.nlink.active::after{
+  content:"";position:absolute;left:50%;bottom:1px;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 8px var(--accent);
+}
+.pill .btn{margin-left:8px}
+
+.burger{display:none;width:42px;height:42px;border:1px solid var(--line);border-radius:50%;
+  background:var(--glass);backdrop-filter:blur(22px);align-items:center;justify-content:center}
+.burger span{display:block;width:15px;height:1.5px;background:var(--white);position:relative;transition:.3s}
+.burger span::before,.burger span::after{content:"";position:absolute;left:0;width:15px;height:1.5px;background:var(--white);transition:.3s}
+.burger span::before{top:-5px}.burger span::after{top:5px}
+.burger.open span{background:transparent}
+.burger.open span::before{top:0;transform:rotate(45deg)}
+.burger.open span::after{top:0;transform:rotate(-45deg)}
+
+.mobile-menu{
+  position:fixed;inset:0;z-index:190;
+  background:rgba(0,0,0,.96);backdrop-filter:blur(30px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  opacity:0;pointer-events:none;transition:opacity .3s;
+}
+.mobile-menu.open{opacity:1;pointer-events:auto}
+.mobile-menu a{font-size:26px;font-weight:300;letter-spacing:-.02em;padding:12px 0;color:var(--grey)}
+.mobile-menu a:hover{color:var(--accent)}
+.mobile-menu .btn{margin-top:22px}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{
+  position:relative;
+  min-height:100svh;
+  display:flex;align-items:center;
+  padding:150px 0 0;
+  background:#000 url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=2000&q=70') center/cover no-repeat;
+  /* NOTE: hotlinked. Self-host before production. */
+}
+.hero::after{
+  content:"";position:absolute;inset:0;
+  background:
+    linear-gradient(180deg,rgba(0,0,0,.86) 0%,rgba(0,0,0,.7) 30%,rgba(0,0,0,.88) 72%,#000 100%),
+    radial-gradient(1100px 620px at 22% 32%,rgba(34,224,168,.11),transparent 66%);
+}
+.hero-inner{position:relative;z-index:2;width:100%}
+.hero h1{
+  font-size:clamp(44px,7.2vw,104px);
+  font-weight:300;letter-spacing:-.035em;line-height:.98;
+  margin:26px 0 22px;
+}
+.hero h1 .sub-line{display:block;color:var(--grey)}
+.hero .lead{max-width:560px;font-size:18px}
+.hero-cta{display:flex;gap:13px;flex-wrap:wrap;margin-top:34px}
+.hero-meta{
+  display:flex;gap:26px;flex-wrap:wrap;margin-top:44px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--grey-dim);
+}
+.hero-meta span{display:flex;align-items:center;gap:7px}
+.hero-meta i{width:5px;height:5px;border-radius:50%;background:var(--accent);font-style:normal;box-shadow:0 0 7px var(--accent)}
+
+/* ---------- hero demo card (the signature element) ---------- */
+.demo-shell{position:relative;z-index:3;margin-top:74px;padding-bottom:0}
+.demo{
+  max-width:920px;margin:0 auto;transform:translateY(76px);
+  background:var(--glass-solid);
+  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow:0 44px 110px rgba(0,0,0,.9),0 0 0 1px rgba(34,224,168,.05);
+  overflow:hidden;
+}
+.demo-bar{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 18px;border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+}
+.demo-bar .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.14)}
+.demo-bar .label{
+  margin-left:8px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.08em;color:var(--grey-dim);
+}
+.demo-bar .live{
+  margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  color:var(--accent);display:flex;align-items:center;gap:6px;
+}
+.demo-bar .live i{width:5px;height:5px;border-radius:50%;background:var(--accent);font-style:normal;animation:blip 2.2s ease-in-out infinite}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.25}}
+
+.demo-body{padding:24px 22px 20px}
+
+.prompt{
+  display:flex;gap:13px;align-items:flex-start;
+  padding-bottom:20px;margin-bottom:6px;
+  border-bottom:1px solid var(--line);
+}
+.prompt .who{
+  width:26px;height:26px;border-radius:7px;flex:none;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;color:var(--grey);
+}
+.prompt p{font-size:15px;line-height:1.55;color:var(--white);font-weight:300}
+.prompt code{font-family:var(--mono);font-size:13px;color:var(--accent);background:var(--accent-dim);padding:1px 5px;border-radius:4px}
+
+.worker{
+  display:flex;gap:13px;align-items:flex-start;
+  padding:13px 0;
+  opacity:0;transform:translateY(10px);
+  transition:opacity .55s ease,transform .55s cubic-bezier(.22,1,.36,1);
+}
+.worker.in{opacity:1;transform:none}
+.worker .ico{
+  width:26px;height:26px;border-radius:7px;flex:none;
+  background:var(--accent-dim);border:1px solid var(--accent-line);
+  display:flex;align-items:center;justify-content:center;
+}
+.worker .ico svg{width:13px;height:13px}
+.worker .txt{min-width:0;flex:1}
+.worker .tag{
+  font-family:var(--mono);font-size:12.5px;font-weight:500;
+  color:var(--accent);letter-spacing:-.01em;
+}
+.worker .desc{font-size:13.5px;color:var(--grey);line-height:1.5;margin-top:3px}
+.worker .out{
+  font-family:var(--mono);font-size:11.5px;color:var(--grey-dim);
+  margin-top:7px;padding-left:11px;border-left:1px solid var(--line);
+  line-height:1.75;
+}
+.worker .out b{color:var(--white);font-weight:500}
+.worker .out .hi{color:var(--crit)}
+.worker .out .am{color:var(--warn)}
+.worker .out .ok{color:var(--accent)}
+
+.done{
+  display:flex;align-items:center;gap:10px;
+  margin-top:14px;padding:13px 15px;
+  background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:10px;
+  font-size:13.5px;color:var(--white);
+  opacity:0;transform:translateY(10px);
+  transition:opacity .55s ease,transform .55s cubic-bezier(.22,1,.36,1);
+}
+.done.in{opacity:1;transform:none}
+.done .check{
+  width:19px;height:19px;border-radius:50%;background:var(--accent);flex:none;
+  display:flex;align-items:center;justify-content:center;color:#00120C;font-size:11px;font-weight:600;
+}
+.done em{font-style:normal;font-family:var(--mono);font-size:11.5px;color:var(--accent);margin-left:auto;white-space:nowrap}
+
+.demo-input{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  margin-top:18px;padding:11px 11px 11px 15px;
+  border:1px solid var(--line);border-radius:100px;
+  background:rgba(255,255,255,.02);
+}
+.demo-input .ph{font-size:13.5px;color:var(--grey-dim);flex:1;min-width:130px}
+.chip{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;
+  color:var(--grey);border:1px solid var(--line);
+  padding:5px 11px;border-radius:100px;white-space:nowrap;
+}
+.send{
+  width:32px;height:32px;border-radius:50%;background:var(--accent);flex:none;
+  display:flex;align-items:center;justify-content:center;color:#00120C;
+}
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+.section{padding:130px 0;position:relative}
+.section-tight{padding:96px 0}
+
+/* --- The Problem --- */
+.statement{
+  font-size:clamp(28px,4vw,54px);
+  font-weight:300;letter-spacing:-.025em;line-height:1.16;
+  max-width:16ch;
+}
+.statement.wide{max-width:22ch}
+.problem-grid{
+  display:grid;grid-template-columns:1.25fr 1fr;gap:70px;align-items:end;margin-top:34px;
+}
+.figures{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.fig{display:flex;align-items:baseline;gap:16px;padding:19px 22px;background:#000}
+.fig .n{font-family:var(--mono);font-size:26px;font-weight:500;color:var(--accent);letter-spacing:-.02em;min-width:96px}
+.fig .l{font-size:13px;color:var(--grey);line-height:1.45}
+.src{font-family:var(--mono);font-size:10.5px;color:var(--grey-dim);margin-top:16px;letter-spacing:.04em;line-height:1.7}
+
+/* --- split header --- */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:end;margin-bottom:56px}
+.split .right{display:flex;flex-direction:column;align-items:flex-start;gap:22px}
+
+/* --- 3-card image rows --- */
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.icard{
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--bg-raise);
+  transition:transform .4s cubic-bezier(.22,1,.36,1),border-color .3s,box-shadow .3s;
+}
+.icard:hover{transform:translateY(-5px);border-color:var(--accent-line);box-shadow:0 22px 60px rgba(0,0,0,.7)}
+.icard .media{
+  position:relative;height:230px;
+  background-size:cover;background-position:center;background-color:#070a09;
+  display:flex;align-items:flex-end;padding:15px;
+}
+.icard .media::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,.82) 100%);
+}
+.panel{
+  position:relative;z-index:2;width:100%;
+  background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--line);border-radius:11px;
+  padding:13px 14px;
+  font-family:var(--mono);font-size:11px;line-height:1.85;color:var(--grey);
+}
+.panel .ph{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--line);
+  font-size:10px;letter-spacing:.09em;color:var(--grey-dim);
+}
+.pill-tag{padding:2px 8px;border-radius:100px;font-size:9.5px;letter-spacing:.06em}
+.pt-ok{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-line)}
+.pt-warn{background:rgba(232,181,74,.12);color:var(--warn);border:1px solid rgba(232,181,74,.3)}
+.pt-crit{background:rgba(232,105,92,.12);color:var(--crit);border:1px solid rgba(232,105,92,.3)}
+.kv{display:flex;justify-content:space-between;gap:12px}
+.kv b{color:var(--white);font-weight:500}
+.bar{height:4px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.bar i.am{background:var(--warn)}
+.bar i.cr{background:var(--crit)}
+.icard .cap{padding:22px}
+.icard .cap h3{font-size:19px;font-weight:400;letter-spacing:-.02em;margin-bottom:8px}
+.icard .cap p{font-size:14px;color:var(--grey);line-height:1.6}
+.stage{
+  font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  color:var(--accent);display:block;margin-bottom:9px;
+}
+
+/* --- belief --- */
+.belief{text-align:center;max-width:940px;margin:0 auto}
+.belief .statement{max-width:none;margin-top:26px}
+
+/* --- Four Pillars --- */
+.pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:52px}
+.pillar{
+  background:var(--bg-raise);border:1px solid var(--line);border-radius:14px;
+  padding:0 0 26px;overflow:hidden;
+  transition:transform .4s cubic-bezier(.22,1,.36,1),border-color .3s;
+}
+.pillar:hover{transform:translateY(-5px);border-color:var(--accent-line)}
+.pillar .topbar{height:3px;width:56px;background:var(--accent);border-radius:0 0 3px 0}
+.pillar .body{padding:26px 24px 0}
+.pillar .mod{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--grey-dim);display:block;margin-bottom:11px}
+.pillar h3{font-size:22px;font-weight:400;letter-spacing:-.025em;margin-bottom:11px}
+.pillar p{font-size:14px;color:var(--grey);line-height:1.62}
+.pillar .metric{
+  margin-top:18px;padding-top:15px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.03em;
+}
+
+/* --- Founder --- */
+.founder-grid{display:grid;grid-template-columns:400px 1fr;gap:64px;align-items:start;margin-top:48px}
+.portrait{
+  position:relative;border-radius:16px;overflow:hidden;
+  border:1px solid var(--line);
+  aspect-ratio:4/5;
+  background:
+    radial-gradient(520px 300px at 30% 22%,rgba(34,224,168,.16),transparent 62%),
+    linear-gradient(165deg,#0B0F0E 0%,#000 100%);
+  display:flex;align-items:flex-end;
+}
+.portrait .mono-mark{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:120px;font-weight:300;letter-spacing:-.05em;
+  color:rgba(255,255,255,.07);
+}
+.portrait .grid-tex{
+  position:absolute;inset:0;
+  background-image:radial-gradient(rgba(255,255,255,.09) 1px,transparent 1px);
+  background-size:22px 22px;opacity:.5;
+}
+.badge{
+  position:relative;z-index:2;margin:16px;width:calc(100% - 32px);
+  background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--line);border-radius:11px;padding:14px 16px;
+}
+.badge .nm{font-size:17px;font-weight:500;letter-spacing:-.02em}
+.badge .rl{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent);margin-top:4px}
+.founder-copy h2{margin-bottom:22px}
+.founder-copy p{color:var(--grey);font-size:15.5px;line-height:1.72;margin-bottom:18px;font-weight:300}
+.pquote{
+  border-left:2px solid var(--accent);
+  padding:6px 0 6px 24px;margin:30px 0;
+  font-size:20px;font-weight:300;letter-spacing:-.02em;line-height:1.42;color:var(--white);
+}
+.pquote cite{display:block;font-family:var(--mono);font-size:10.5px;font-style:normal;letter-spacing:.12em;color:var(--grey-dim);margin-top:13px}
+.founder-cta{display:flex;gap:11px;flex-wrap:wrap;margin-top:26px}
+
+/* --- Trust --- */
+.trust-grid{display:grid;grid-template-columns:1fr 1fr;gap:70px;align-items:center;margin-top:40px}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+.tag{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--grey);border:1px solid var(--line);border-radius:100px;padding:7px 13px;
+  transition:border-color .25s,color .25s;
+}
+.tag:hover{border-color:var(--accent-line);color:var(--accent)}
+.dotfield{
+  position:relative;border:1px solid var(--line);border-radius:16px;
+  min-height:290px;padding:30px;
+  background-image:radial-gradient(rgba(255,255,255,.13) 1px,transparent 1px);
+  background-size:20px 20px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  overflow:hidden;
+}
+.dotfield::after{
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(460px 260px at 72% 28%,rgba(34,224,168,.13),transparent 68%);
+  pointer-events:none;
+}
+.dotfield .ring{position:relative;z-index:2}
+.dotfield .ring svg{width:74px;height:74px}
+.dotfield .tcta{position:relative;z-index:2;display:flex;gap:11px;flex-wrap:wrap}
+.dotfield .note{position:relative;z-index:2;font-family:var(--mono);font-size:11px;color:var(--grey-dim);line-height:1.8;margin:18px 0}
+
+/* --- final CTA --- */
+.final{text-align:center;padding:150px 0}
+.final h2{margin:26px auto 20px;max-width:16ch}
+.final .lead{max-width:520px;margin:0 auto}
+.final .btns{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;margin-top:36px}
+.final .fine{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--grey-dim);margin-top:22px}
+
+/* --- Footer --- */
+.footer{
+  border-top:1px solid var(--line);
+  padding:70px 0 30px;
+  background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1px);
+  background-size:22px 22px;
+  position:relative;overflow:hidden;
+}
+.footer::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,#000 0%,rgba(0,0,0,.55) 42%,rgba(0,0,0,.9) 100%);
+  pointer-events:none;
+}
+.footer .wrap{position:relative;z-index:2}
+.foot-top{display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:44px;padding-bottom:56px}
+.foot-brand .brand{margin-bottom:16px}
+.foot-brand p{font-size:13.5px;color:var(--grey);line-height:1.7;max-width:260px}
+.foot-brand .addr{font-family:var(--mono);font-size:11px;color:var(--grey-dim);margin-top:18px;line-height:1.9}
+.fcol h4{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);margin-bottom:15px}
+.fcol a{display:block;font-size:13.5px;color:var(--grey);padding:5px 0;transition:color .2s}
+.fcol a:hover{color:var(--white)}
+.watermark{
+  font-size:clamp(64px,15.5vw,220px);font-weight:300;letter-spacing:-.055em;
+  color:rgba(255,255,255,.035);line-height:.8;
+  user-select:none;pointer-events:none;text-align:center;
+  padding:14px 0 26px;
+}
+.foot-bottom{
+  border-top:1px solid var(--line);padding-top:24px;
+  display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  font-family:var(--mono);font-size:11px;color:var(--grey-dim);letter-spacing:.04em;
+}
+.foot-bottom a:hover{color:var(--accent)}
+
+/* --- scroll reveal --- */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1)}
+.rv.in{opacity:1;transform:none}
+.rv-1{transition-delay:.08s}.rv-2{transition-delay:.16s}.rv-3{transition-delay:.24s}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media(max-width:1080px){
+  .pillars{grid-template-columns:repeat(2,1fr)}
+  .founder-grid{grid-template-columns:330px 1fr;gap:44px}
+  .foot-top{grid-template-columns:1fr 1fr 1fr;gap:36px}
+  .foot-brand{grid-column:1/-1}
+}
+@media(max-width:900px){
+  :root{--pad:22px}
+  .pill{display:none}
+  .burger{display:flex}
+  .row3{grid-template-columns:1fr}
+  .split,.problem-grid,.trust-grid,.founder-grid{grid-template-columns:1fr;gap:34px}
+  .problem-grid,.trust-grid{align-items:start}
+  .section{padding:88px 0}
+  .section-tight{padding:70px 0}
+  .final{padding:100px 0}
+  .hero{padding-top:130px;min-height:auto;padding-bottom:0}
+  .demo{transform:translateY(56px)}
+  .demo-shell{margin-top:56px}
+  .statement,.statement.wide{max-width:none}
+  .portrait{max-width:340px}
+  .icard .media{height:200px}
+}
+@media(max-width:560px){
+  .foot-top{grid-template-columns:1fr 1fr}
+  .hero-meta{gap:14px}
+  .fig{flex-direction:column;gap:4px}
+  .fig .n{min-width:0}
+  .demo-body{padding:18px 15px 15px}
+  .worker .out{font-size:10.5px}
+}
+
+/* --- reduced motion --- */
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .rv,.worker,.done{opacity:1!important;transform:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ NAV ══════════════ -->
+<nav class="nav" id="nav">
+  <a href="#top" class="brand" aria-label="Noctrix home">
+    <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M16 3a13 13 0 1 1-9.2 22.2" stroke="#22E0A8" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="6.8" cy="25.2" r="3.4" fill="#22E0A8"/>
+    </svg>
+    <span class="brand-name">Noctrix</span>
+  </a>
+
+  <div class="pill" id="pill">
+    <span class="pill-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none">
+        <path d="M16 3a13 13 0 1 1-9.2 22.2" stroke="#22E0A8" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="6.8" cy="25.2" r="3.4" fill="#22E0A8"/>
+      </svg>
+    </span>
+    <a href="#problem" class="nlink">Problem</a>
+    <a href="#how" class="nlink">How it works</a>
+    <a href="#capabilities" class="nlink">Capabilities</a>
+    <a href="#platform" class="nlink">Platform</a>
+    <a href="#founder" class="nlink">Founder</a>
+    <a href="#trust" class="nlink">Trust</a>
+    <a href="#start" class="btn btn-accent btn-sm">Book a demo</a>
+  </div>
+
+  <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false"><span></span></button>
+</nav>
+
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#problem">Problem</a>
+  <a href="#how">How it works</a>
+  <a href="#capabilities">Capabilities</a>
+  <a href="#platform">Platform</a>
+  <a href="#founder">Founder</a>
+  <a href="#trust">Trust</a>
+  <a href="#start" class="btn btn-accent">Book a demo</a>
+</div>
+
+<!-- ══════════════ HERO ══════════════ -->
+<header class="hero" id="top">
+  <div class="hero-inner">
+    <div class="wrap">
+      <span class="eyebrow">Engineering systems intelligence</span>
+      <h1>
+        Close the loop.
+        <span class="sub-line">Every tool sees an arc.</span>
+      </h1>
+      <p class="lead">
+        Noctrix connects code review, incident response, infrastructure cost and delivery
+        flow into one causal graph — so your reviewer knows what broke last time, and your
+        on-call knows what shipped this time.
+      </p>
+      <div class="hero-cta">
+        <a href="#start" class="btn btn-white">Get your attribution report</a>
+        <a href="#how" class="btn btn-ghost">See how it works</a>
+      </div>
+      <div class="hero-meta">
+        <span><i></i>Read-only connectors</span>
+        <span><i></i>Live in under 20 minutes</span>
+        <span><i></i>12 months backfilled on connect</span>
+      </div>
+    </div>
+
+    <!-- signature element: the live incident console -->
+    <div class="demo-shell">
+      <div class="wrap">
+        <div class="demo" id="demo">
+          <div class="demo-bar">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="label">noctrix · #inc-2261 · payment-service</span>
+            <span class="live"><i></i>ASSEMBLING</span>
+          </div>
+
+          <div class="demo-body">
+            <div class="prompt">
+              <span class="who">RS</span>
+              <p><code>payment-service</code> p99 is up 340% since 14:32. What broke, who owns it, and what is it costing us?</p>
+            </div>
+
+            <div class="worker" data-w>
+              <span class="ico" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M6 3L2 8l4 5M10 3l4 5-4 5" stroke="#22E0A8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <div class="txt">
+                <div class="tag">@Sentry</div>
+                <div class="desc">Correlates the change set against production history and prior incident attribution.</div>
+                <div class="out">
+                  deploy <b>#3847</b> → payment-service · merged 14:29 UTC<br>
+                  flagged <span class="hi">HIGH</span> pre-merge · approved in 4m by 1 reviewer<br>
+                  touches <b>settlement/retry.py</b> — implicated in <span class="am">#2118, #1974</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="worker" data-w>
+              <span class="ico" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.2" stroke="#22E0A8" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="#22E0A8"/></svg></span>
+              <div class="txt">
+                <div class="tag">@Vigil</div>
+                <div class="desc">Ranks root-cause hypotheses and maps live blast radius across dependent services.</div>
+                <div class="out">
+                  <b>91%</b> retry backoff removed → connection pool exhaustion<br>
+                  <b>6%</b> RDS replica lag · <b>3%</b> upstream traffic anomaly<br>
+                  blast radius: <span class="am">checkout, order-api, ledger-sync</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="worker" data-w>
+              <span class="ico" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2.5 12.5V7M6.5 12.5V4M10.5 12.5V9M14 12.5V6" stroke="#22E0A8" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+              <div class="txt">
+                <div class="tag">@Ledger</div>
+                <div class="desc">Prices the incident and flags the infrastructure the rollback will strand.</div>
+                <div class="out">
+                  failed-checkout burn rate <b>$4,180/min</b> · 22 min elapsed<br>
+                  rollback will orphan <b>6 × db.r6g.2xlarge</b> read replicas<br>
+                  reclaim if unclaimed by 18:00 → <span class="ok">$2,940/mo</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="worker" data-w>
+              <span class="ico" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 11.5c3-6 9-6 12 0" stroke="#22E0A8" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.6" r="1.7" fill="#22E0A8"/></svg></span>
+              <div class="txt">
+                <div class="tag">@Flow</div>
+                <div class="desc">Traces the delivery conditions that let the change through, and who to page.</div>
+                <div class="out">
+                  on-call <b>@riya.s</b> · true owner <b>@dan.k</b> (14 commits, 3 incidents)<br>
+                  review latency on this repo up <span class="hi">3.4×</span> this quarter<br>
+                  postmortem action from <b>#2118</b> — <span class="am">still open, 94 days</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="done" id="done">
+              <span class="check" aria-hidden="true">✓</span>
+              <span>Context package delivered to <strong>#inc-2261</strong> — rollback drafted, RCA scaffolded, owners paged.</span>
+              <em>1.9s</em>
+            </div>
+
+            <div class="demo-input">
+              <span class="ph">Ask Noctrix anything about your system…</span>
+              <span class="chip">/blast-radius</span>
+              <span class="chip">/similar-incidents</span>
+              <span class="chip">/draft-rca</span>
+              <span class="send" aria-hidden="true">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" stroke="#00120C" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════ THE PROBLEM ══════════════ -->
+<section class="section" id="problem" style="padding-top:170px">
+  <div class="wrap">
+    <span class="eyebrow rv">The problem</span>
+    <div class="problem-grid">
+      <h2 class="statement wide rv rv-1">
+        AI made writing code cheap. It made
+        <span class="accent-txt">everything after writing code expensive.</span>
+      </h2>
+      <div class="rv rv-2">
+        <div class="figures">
+          <div class="fig"><span class="n">+441%</span><span class="l">median time a pull request spends in review</span></div>
+          <div class="fig"><span class="n">+243%</span><span class="l">production incidents per merged change</span></div>
+          <div class="fig"><span class="n">5.3×</span><span class="l">longer wait for reviewer pickup on agent-authored PRs</span></div>
+          <div class="fig"><span class="n">29%</span><span class="l">of cloud spend now wasted — a five-year high</span></div>
+          <div class="fig"><span class="n">−7%</span><span class="l">main-branch throughput for the median team</span></div>
+        </div>
+        <p class="src">
+          Faros AI, <em>Acceleration Whiplash</em> (22k developers) · LinearB (8.1M pull requests,
+          4,800 orgs) · CircleCI <em>State of Software Delivery</em> (28M workflow runs) ·
+          Flexera <em>State of the Cloud</em> 2026. Verify before citing.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ HOW IT WORKS ══════════════ -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <span class="eyebrow rv">How it works</span>
+        <h2 class="h-lg rv rv-1" style="margin-top:20px">Connect once.<br>The graph does the rest.</h2>
+      </div>
+      <div class="right rv rv-2">
+        <p class="lead">
+          Noctrix reads your existing stack — it does not replace it. No agents on developer
+          machines, no workflow migration, no repo changes. Twelve months of history is
+          backfilled on connect, so the first insight lands the same day.
+        </p>
+        <a href="#trust" class="btn btn-ghost">Read the security model</a>
+      </div>
+    </div>
+
+    <div class="row3">
+      <article class="icard rv">
+        <div class="media" style="background-image:url('https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1200&q=70')">
+          <div class="panel">
+            <div class="ph"><span>CONNECTORS · READ-ONLY</span><span class="pill-tag pt-ok">8 LINKED</span></div>
+            <div class="kv"><span>github · 41 repos</span><b>synced</b></div>
+            <div class="kv"><span>aws · 3 accounts</span><b>synced</b></div>
+            <div class="kv"><span>datadog · apm + logs</span><b>synced</b></div>
+            <div class="kv"><span>pagerduty · 6 services</span><b>synced</b></div>
+            <div class="kv"><span>backfill 12mo</span><b class="accent-txt">98%</b></div>
+            <div class="bar"><i style="width:98%"></i></div>
+          </div>
+        </div>
+        <div class="cap">
+          <span class="stage">STAGE 01 — INGEST</span>
+          <h3>Read your stack, change nothing</h3>
+          <p>Scoped read-only OAuth into GitHub or GitLab, AWS or GCP, Datadog or Grafana, PagerDuty, Jira and Slack. Median time to first connector: eleven minutes.</p>
+        </div>
+      </article>
+
+      <article class="icard rv rv-1">
+        <div class="media" style="background-image:url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=70')">
+          <div class="panel">
+            <div class="ph"><span>TEMPORAL GRAPH</span><span class="pill-tag pt-ok">LIVE</span></div>
+            <div class="kv"><span>change → modifies → service</span><b>418k</b></div>
+            <div class="kv"><span>deploy → precedes → incident</span><b>2.1k</b></div>
+            <div class="kv"><span>service → depends_on → service</span><b>9.4k</b></div>
+            <div class="kv"><span>engineer → owns → service</span><b>observed</b></div>
+            <div class="kv"><span>history depth</span><b class="accent-txt">14 months</b></div>
+          </div>
+        </div>
+        <div class="cap">
+          <span class="stage">STAGE 02 — GRAPH</span>
+          <h3>Every edge carries a timestamp</h3>
+          <p>Ownership is inferred from commits, reviews and who actually got paged — not from a stale CODEOWNERS file. Who owned checkout in March is a different answer than today, and the graph knows both.</p>
+        </div>
+      </article>
+
+      <article class="icard rv rv-2">
+        <div class="media" style="background-image:url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=70')">
+          <div class="panel">
+            <div class="ph"><span>REASONING · PR #3902</span><span class="pill-tag pt-crit">HIGH</span></div>
+            <div class="kv"><span>incident-attributed path</span><b>4.2× base</b></div>
+            <div class="bar"><i class="cr" style="width:84%"></i></div>
+            <div class="kv" style="margin-top:6px"><span>blast radius</span><b>7 services</b></div>
+            <div class="bar"><i class="am" style="width:58%"></i></div>
+            <div class="kv" style="margin-top:6px"><span>reviewer exposure</span><b>low</b></div>
+            <div class="bar"><i style="width:19%"></i></div>
+          </div>
+        </div>
+        <div class="cap">
+          <span class="stage">STAGE 03 — REASON</span>
+          <h3>Judgement, with the receipts attached</h3>
+          <p>Every score shows its chain: which incidents, which services, which prior decisions. Noctrix does not ask for trust — it shows the evidence and lets the engineer disagree.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ WHAT WE BELIEVE ══════════════ -->
+<section class="section-tight" style="border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap belief">
+    <span class="eyebrow is-center rv">What we believe</span>
+    <h2 class="statement rv rv-1">
+      A code reviewer that never learns whether it was right
+      <span class="accent-txt">is not intelligence. It is opinion at scale.</span>
+    </h2>
+  </div>
+</section>
+
+<!-- ══════════════ CAPABILITIES ══════════════ -->
+<section class="section" id="capabilities">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <span class="eyebrow rv">Capabilities</span>
+        <h2 class="h-lg rv rv-1" style="margin-top:20px">What the loop<br>lets us do.</h2>
+      </div>
+      <div class="right rv rv-2">
+        <p class="lead">
+          None of these are features you could bolt onto a point solution. Each one requires
+          knowing what happened in a different part of the system — which is the entire
+          argument for building the graph first.
+        </p>
+        <a href="#start" class="btn btn-ghost">See it on your own repos</a>
+      </div>
+    </div>
+
+    <div class="row3">
+      <article class="icard rv">
+        <div class="media" style="background-image:url('https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?auto=format&fit=crop&w=1200&q=70')">
+          <div class="panel">
+            <div class="ph"><span>settlement/retry.py</span><span class="pill-tag pt-crit">RISK: HIGH</span></div>
+            <span style="color:var(--crit)">− &nbsp;retry = backoff(attempts=3)</span><br>
+            <span class="accent-txt">+ &nbsp;retry = None &nbsp;# perf</span>
+            <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line);color:var(--grey)">
+              <span class="accent-txt">◆ noctrix</span> — this removes the only backoff on the
+              settlement path. Identical change preceded <b style="color:#fff">#2118</b> (4h 12m, P1).
+              Review lines 40–58 first; the rest is mechanical.
+            </div>
+          </div>
+        </div>
+        <div class="cap">
+          <h3>Review that remembers production</h3>
+          <p>Risk scored against your own incident history, not a generic benchmark. Reviewers routed by who has actually shipped and on-called for the touched paths. Every flag is tracked to its production outcome, so precision improves on your codebase specifically.</p>
+        </div>
+      </article>
+
+      <article class="icard rv rv-1">
+        <div class="media" style="background-image:url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&q=70')">
+          <div class="panel">
+            <div class="ph"><span>INC-2261 · T+00:47</span><span class="pill-tag pt-warn">P1 OPEN</span></div>
+            <div class="kv"><span>hypothesis</span><b>pool exhaustion</b></div>
+            <div class="kv"><span>confidence</span><b class="accent-txt">91%</b></div>
+            <div class="bar"><i style="width:91%"></i></div>
+            <div class="kv" style="margin-top:7px"><span>resembles</span><b>#2118 · #1974</b></div>
+            <div class="kv"><span>runbook</span><b>§4.2 pool reset</b></div>
+            <div class="kv"><span>rollback</span><b class="accent-txt">drafted</b></div>
+          </div>
+        </div>
+        <div class="cap">
+          <h3>The first twenty minutes, already done</h3>
+          <p>Ranked hypotheses with visible reasoning, live blast radius, true ownership, matched historical incidents and the relevant runbook section — in the channel before the responder has finished reading the page.</p>
+        </div>
+      </article>
+
+      <article class="icard rv rv-2">
+        <div class="media" style="background-image:url('https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&w=1200&q=70')">
+          <div class="panel">
+            <div class="ph"><span>COST GATE · terraform/prod</span><span class="pill-tag pt-warn">+$6.2K/MO</span></div>
+            <div class="kv"><span>8 × r5.2xlarge → r5.large</span><b class="accent-txt">safe</b></div>
+            <div class="kv"><span>34 orphaned EBS volumes</span><b class="accent-txt">safe</b></div>
+            <div class="kv"><span>checkout-db right-size</span><b style="color:var(--crit)">blocked</b></div>
+            <div style="color:var(--grey);margin-top:7px;padding-top:7px;border-top:1px solid var(--line)">
+              blocked — 3 P1s in 90d, critical path
+            </div>
+          </div>
+        </div>
+        <div class="cap">
+          <h3>Cost decisions that know what is critical</h3>
+          <p>Every saving is graded by the service's incident history and position in the critical path. A cost gate on Terraform pull requests catches over-provisioning before merge, rather than in next quarter's bill.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FOUR PILLARS ══════════════ -->
+<section class="section" id="platform" style="border-top:1px solid var(--line)">
+  <div class="wrap" style="text-align:center">
+    <span class="eyebrow is-center rv">The platform</span>
+    <h2 class="h-lg rv rv-1" style="margin-top:20px">Four surfaces. One graph underneath.</h2>
+    <p class="lead rv rv-2" style="max-width:620px;margin:20px auto 0">
+      Each module is useful alone. Together they close the causal loop that runs from review
+      to merge to deploy to incident to cost and back into next quarter's cycle time.
+    </p>
+  </div>
+
+  <div class="wrap">
+    <div class="pillars">
+      <article class="pillar rv">
+        <div class="topbar"></div>
+        <div class="body">
+          <span class="mod">MODULE 01</span>
+          <h3>Sentry</h3>
+          <p>Code review intelligence. Production-calibrated risk scoring, blast radius mapping, reviewer routing by real exposure, and architecture drift detection across the org.</p>
+          <div class="metric">Review that remembers production</div>
+        </div>
+      </article>
+
+      <article class="pillar rv rv-1">
+        <div class="topbar"></div>
+        <div class="body">
+          <span class="mod">MODULE 02</span>
+          <h3>Vigil</h3>
+          <p>Incident intelligence. Context package in under ninety seconds, ranked root-cause hypotheses, pre-incident signal correlation and auto-drafted RCAs in your own template.</p>
+          <div class="metric">The first twenty minutes, already done</div>
+        </div>
+      </article>
+
+      <article class="pillar rv rv-2">
+        <div class="topbar"></div>
+        <div class="body">
+          <span class="mod">MODULE 03</span>
+          <h3>Ledger</h3>
+          <p>Infrastructure intelligence. A criticality-weighted optimisation backlog, deploy-time cost gates on Terraform, and waste attributed to the team and service that created it.</p>
+          <div class="metric">Cost decisions with engineering context</div>
+        </div>
+      </article>
+
+      <article class="pillar rv rv-3">
+        <div class="topbar"></div>
+        <div class="body">
+          <span class="mod">MODULE 04</span>
+          <h3>Flow</h3>
+          <p>Delivery intelligence. DORA plus the AI-era extensions — authorship attribution, code durability, stage-resolved cycle time and review queue concentration.</p>
+          <div class="metric">Team level only. Never individual.</div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FOUNDER ══════════════ -->
+<section class="section" id="founder" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <span class="eyebrow rv">Founder</span>
+
+    <div class="founder-grid">
+      <!-- Portrait: monogram placeholder. Replace the .portrait background with a
+           real photograph before launch — <img src="assets/mann-agarwal.jpg"> -->
+      <div class="portrait rv rv-1">
+        <div class="grid-tex" aria-hidden="true"></div>
+        <div class="mono-mark" aria-hidden="true">MA</div>
+        <div class="badge">
+          <div class="nm">Mann Agarwal</div>
+          <div class="rl">FOUNDER — NOCTRIX</div>
+        </div>
+      </div>
+
+      <div class="founder-copy rv rv-2">
+        <h2 class="h-md">Noctrix started as the question nobody in the incident channel could answer: what changed?</h2>
+
+        <p>
+          The information always exists. It is in the deploy log, the pull request thread, the
+          alert history, the billing console and somebody's memory of a similar outage eight
+          months ago. It is never in one place, and the person who has to assemble it is
+          usually doing so at 3am with a customer-facing outage running.
+        </p>
+
+        <p>
+          The AI coding wave made that gap structural rather than annoying. Teams are shipping
+          far more code and reviewing it far more slowly, and the tooling market has responded
+          by selling four separate AI products that each see one slice of the same causal
+          chain. Noctrix is the argument that the chain is the product — and that a system
+          which watches your deploys, your incidents and your bill for a year knows things
+          about your architecture that no individual engineer does.
+        </p>
+
+        <blockquote class="pquote">
+          Noctrix will never produce individual developer performance metrics. Not as a
+          feature, not as a setting, not on request. The moment engineers believe the tool is
+          watching them rather than the system, it stops working — and they would be right.
+          <cite>MANN AGARWAL · FOUNDER</cite>
+        </blockquote>
+
+        <div class="founder-cta">
+          <a href="mailto:operations@noctrix.digital" class="btn btn-accent">operations@noctrix.digital</a>
+          <a href="https://www.linkedin.com/in/mann-agarwal/" target="_blank" rel="noopener noreferrer" class="btn btn-ghost">LinkedIn ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ TRUST & DATA ══════════════ -->
+<section class="section" id="trust" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <span class="eyebrow rv">Trust &amp; data</span>
+    <h2 class="h-lg rv rv-1" style="margin-top:20px;max-width:14ch">Your code is not our training data.</h2>
+
+    <div class="trust-grid">
+      <div class="rv rv-2">
+        <p class="lead">
+          Noctrix requests read-only scopes by default and enumerates every one of them before
+          you authorise it. Nothing we ingest trains a model — yours or anyone else's. Every
+          action the reasoning layer takes is written to an audit log you can export, and
+          teams with data residency or isolation requirements can run the graph inside their
+          own VPC.
+        </p>
+        <p class="lead" style="margin-top:16px">
+          If your security team needs something that is not on this page, write to us
+          directly. We would rather answer the hard question than lose the review.
+        </p>
+        <div class="tags">
+          <span class="tag">Read-only OAuth</span>
+          <span class="tag">No model training on customer data</span>
+          <span class="tag">SOC 2 Type II — in progress</span>
+          <span class="tag">Self-hosted VPC option</span>
+          <span class="tag">Scoped RBAC</span>
+          <span class="tag">Full audit log</span>
+          <span class="tag">Data residency controls</span>
+          <span class="tag">Team-level metrics only</span>
+          <span class="tag">Subprocessor list published</span>
+          <span class="tag">DPA available</span>
+        </div>
+      </div>
+
+      <div class="dotfield rv rv-3">
+        <div class="ring" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none">
+            <path d="M16 3a13 13 0 1 1-9.2 22.2" stroke="#22E0A8" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="6.8" cy="25.2" r="3.2" fill="#22E0A8"/>
+          </svg>
+        </div>
+        <p class="note">
+          scope: repo:read, deployments:read<br>
+          scope: cloudwatch:get, ce:read<br>
+          scope: incidents:read, oncall:read<br>
+          write access: <span class="accent-txt">none, by default</span>
+        </p>
+        <div class="tcta">
+          <a href="mailto:operations@noctrix.digital?subject=Security%20review%20—%20Noctrix" class="btn btn-accent btn-sm">Request the security pack</a>
+          <a href="#start" class="btn btn-ghost btn-sm">Talk to us</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FINAL CTA ══════════════ -->
+<section class="final" id="start" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <span class="eyebrow is-center rv">Get started</span>
+    <h2 class="h-xl rv rv-1">Your incidents already told you this.<br>Nobody was listening.</h2>
+    <p class="lead rv rv-2">
+      Connect your stack and Noctrix returns an attribution report built entirely from your
+      own history — which incidents traced to which reviews, where the queue concentrates,
+      what you are paying for services that no longer deploy.
+    </p>
+    <div class="btns rv rv-3">
+      <a href="mailto:operations@noctrix.digital?subject=Attribution%20report%20—%20Noctrix" class="btn btn-accent">Get your attribution report</a>
+      <a href="mailto:operations@noctrix.digital?subject=Demo%20request%20—%20Noctrix" class="btn btn-ghost">Book a demo</a>
+    </div>
+    <p class="fine rv rv-3">READ-ONLY · NO REPO CHANGES · REPORT IN 72 HOURS</p>
+  </div>
+</section>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a href="#top" class="brand">
+          <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 3a13 13 0 1 1-9.2 22.2" stroke="#22E0A8" stroke-width="2.4" stroke-linecap="round"/>
+            <circle cx="6.8" cy="25.2" r="3.4" fill="#22E0A8"/>
+          </svg>
+          <span class="brand-name">Noctrix</span>
+        </a>
+        <p>Engineering systems intelligence. One causal graph across review, incidents, infrastructure and delivery flow.</p>
+        <div class="addr">
+          operations@noctrix.digital<br>
+          noctrix.digital
+        </div>
+      </div>
+
+      <div class="fcol">
+        <h4>Platform</h4>
+        <a href="#platform">Sentry</a>
+        <a href="#platform">Vigil</a>
+        <a href="#platform">Ledger</a>
+        <a href="#platform">Flow</a>
+        <a href="#how">The graph</a>
+      </div>
+
+      <div class="fcol">
+        <h4>Developers</h4>
+        <a href="#">Documentation</a>
+        <a href="#">API reference</a>
+        <a href="#">MCP server</a>
+        <a href="#how">Integrations</a>
+        <a href="#">Status</a>
+      </div>
+
+      <div class="fcol">
+        <h4>Company</h4>
+        <a href="#founder">Founder</a>
+        <a href="#">Research</a>
+        <a href="#">Changelog</a>
+        <a href="#">Careers</a>
+        <a href="mailto:operations@noctrix.digital">Contact</a>
+      </div>
+
+      <div class="fcol">
+        <h4>Trust</h4>
+        <a href="#trust">Security model</a>
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">DPA</a>
+        <a href="#">Subprocessors</a>
+      </div>
+    </div>
+
+    <div class="watermark" aria-hidden="true">NOCTRIX</div>
+
+    <div class="foot-bottom">
+      <span>© 2026 Noctrix. All rights reserved.</span>
+      <span>Founded by <a href="https://www.linkedin.com/in/mann-agarwal/" target="_blank" rel="noopener noreferrer">Mann Agarwal</a> · noctrix.digital</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- nav compaction ---- */
+  var nav = document.getElementById('nav');
+  function onScroll(){
+    if(window.scrollY > 60){ nav.classList.add('compact'); }
+    else { nav.classList.remove('compact'); }
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  /* ---- mobile menu ---- */
+  var burger = document.getElementById('burger');
+  var menu = document.getElementById('mobileMenu');
+  burger.addEventListener('click', function(){
+    var open = menu.classList.toggle('open');
+    burger.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.body.style.overflow = open ? 'hidden' : '';
+  });
+  menu.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', function(){
+      menu.classList.remove('open');
+      burger.classList.remove('open');
+      burger.setAttribute('aria-expanded','false');
+      document.body.style.overflow = '';
+    });
+  });
+
+  /* ---- scroll reveal ---- */
+  var rvs = document.querySelectorAll('.rv');
+  if(reduce || !('IntersectionObserver' in window)){
+    rvs.forEach(function(el){ el.classList.add('in'); });
+  } else {
+    var rvObs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ e.target.classList.add('in'); rvObs.unobserve(e.target); }
+      });
+    }, {threshold:0.12, rootMargin:'0px 0px -50px 0px'});
+    rvs.forEach(function(el){ rvObs.observe(el); });
+  }
+
+  /* ---- hero demo: sequential worker reveal ---- */
+  var demo = document.getElementById('demo');
+  var workers = demo.querySelectorAll('[data-w]');
+  var done = document.getElementById('done');
+  var live = demo.querySelector('.live');
+
+  function runDemo(){
+    workers.forEach(function(w,i){
+      setTimeout(function(){ w.classList.add('in'); }, 420 + i*680);
+    });
+    setTimeout(function(){
+      done.classList.add('in');
+      if(live){ live.innerHTML = '<i></i>RESOLVED'; }
+    }, 420 + workers.length*680 + 260);
+  }
+
+  if(reduce || !('IntersectionObserver' in window)){
+    workers.forEach(function(w){ w.classList.add('in'); });
+    done.classList.add('in');
+  } else {
+    var demoObs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ runDemo(); demoObs.disconnect(); }
+      });
+    }, {threshold:0.25});
+    demoObs.observe(demo);
+  }
+
+  /* ---- active nav link follows scroll ---- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.pill .nlink'));
+  var sections = links.map(function(l){
+    return document.querySelector(l.getAttribute('href'));
+  }).filter(Boolean);
+
+  function setActive(){
+    var y = window.scrollY + window.innerHeight * 0.32;
+    var current = -1;
+    sections.forEach(function(s,i){
+      if(s && s.offsetTop <= y) current = i;
+    });
+    links.forEach(function(l,i){ l.classList.toggle('active', i === current); });
+  }
+  window.addEventListener('scroll', setActive, {passive:true});
+  window.addEventListener('resize', setActive);
+  setActive();
+})();
+</script>
+
+</body>
+</html>
